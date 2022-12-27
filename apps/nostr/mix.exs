@@ -43,7 +43,8 @@ defmodule Nostr.MixProject do
       {:swoosh, "~> 1.3"},
       {:finch, "~> 0.13"},
       {:secp256k1, git: "https://git.sr.ht/~sgiath/secp256k1"},
-      {:websockex, "~> 0.4"}
+      {:mint_web_socket, "~> 1.0"},
+      {:castore, "~> 0.1"}
     ]
   end
 

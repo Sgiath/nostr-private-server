@@ -18,6 +18,8 @@ defmodule Client.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/nostr", Live.Nostr
   end
 
   # Other scopes may use custom stacks.

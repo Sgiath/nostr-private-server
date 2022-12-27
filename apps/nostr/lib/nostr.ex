@@ -16,6 +16,12 @@ defmodule Nostr do
     end
   end
 
+  def connected_relays do
+    DynamicSupervisor.which_children(__MODULE__)
+  end
+
+  # Private API
+
   def start_link(init_arg) do
     DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end

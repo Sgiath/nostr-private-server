@@ -1,0 +1,5 @@
+<button phx-click="connect">Connect</button>
+
+<%= for r <- @relays do %>
+  <pre><%= inspect(r) %></pre>
+<% end %>
