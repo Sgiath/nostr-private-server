@@ -1,7 +1,21 @@
 defmodule Nostr.Event do
-  def parse(event) do
+  @moduledoc """
+  Nostr Event
+  """
+
+  defstruct [:id, :pubkey, :kind, :tags, :created_at, :content, :sig]
+
+  def parse(event) when is_map(event) do
     if correct_id?(event) and correct_sig?(event) do
-      event
+      %__MODULE__{
+        id: event.id,
+        pubkey: event.pubkey,
+        kind: event.kind,
+        tags: event.tags,
+        created_at: event.created_at,
+        content: event.content,
+        sig: event.sig
+      }
     end
   end
 
@@ -30,13 +44,23 @@ defmodule Nostr.Event do
         created_at: created_at,
         content: content
       }) do
-    Jason.encode!([
-      0,
-      pubkey,
-      created_at,
-      kind,
-      tags,
-      content
-    ])
+    Jason.encode!([0, pubkey, created_at, kind, tags, content])
+  end
+end
+
+defimpl Jason.Encoder, for: Nostr.Event do
+  def encode(%Nostr.Event{} = event, opts) do
+    Jason.Encode.map(
+      %{
+        id: event.id,
+        pubkey: event.pubkey,
+        kind: event.kind,
+        tags: event.tags,
+        created_at: event.created_at,
+        content: event.content,
+        sig: event.sig
+      },
+      opts
+    )
   end
 end

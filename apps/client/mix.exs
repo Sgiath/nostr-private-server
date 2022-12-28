@@ -44,8 +44,7 @@ defmodule Client.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:bandit, "~> 0.6"},
-      {:websockex, "~> 0.4"}
+      {:bandit, "~> 0.6"}
     ]
   end
 

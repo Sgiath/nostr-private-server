@@ -2,176 +2,129 @@ defmodule Nostr.Connection do
   use GenServer
 
   require Logger
-  require Mint.HTTP
 
-  defstruct [:conn, :websocket, :request_ref, :caller, :status, :resp_headers, :closing?]
-
-  def connect(url) do
-    with {:ok, socket} <- GenServer.start_link(__MODULE__, []),
-         {:ok, :connected} <- GenServer.call(socket, {:connect, url}) do
-      {:ok, socket}
-    end
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts)
   end
 
-  def send_message(pid, text) do
-    GenServer.call(pid, {:send_text, text})
+  # Nostr requests
+
+  def event(pid, %Nostr.Event{} = event) do
+    msg =
+      event
+      |> Nostr.Message.create_event()
+      |> Nostr.Message.serialize()
+
+    GenServer.cast(pid, {:send, msg})
   end
+
+  def req(pid, %Nostr.Filter{} = filter, sub_id) do
+    msg =
+      filter
+      |> Nostr.Message.request(sub_id)
+      |> Nostr.Message.serialize()
+
+    GenServer.cast(pid, {:send, msg})
+  end
+
+  def close(pid, sub_id) do
+    msg =
+      sub_id
+      |> Nostr.Message.close()
+      |> Nostr.Message.serialize()
+
+    GenServer.cast(pid, {:send, msg})
+  end
+
+  # Private API
 
   @impl GenServer
-  def init([]) do
-    {:ok, %__MODULE__{}}
-  end
+  def init(opts) do
+    url = opts |> Keyword.fetch!(:url) |> URI.parse()
+    read_only = Keyword.get(opts, :read_only, false)
 
-  @impl GenServer
-  def handle_call({:send_text, text}, _from, state) do
-    {:ok, state} = send_frame(state, {:text, text})
-    {:reply, :ok, state}
-  end
-
-  @impl GenServer
-  def handle_call({:connect, url}, from, state) do
-    uri = URI.parse(url)
-
-    http_scheme =
-      case uri.scheme do
-        "ws" -> :http
-        "wss" -> :https
+    port =
+      case url do
+        %URI{scheme: "wss", port: port} -> port || 443
+        %URI{scheme: "ws", port: port} -> port || 80
       end
 
-    ws_scheme =
-      case uri.scheme do
-        "ws" -> :ws
-        "wss" -> :wss
-      end
+    # Establish WebSocket connection
+    {:ok, conn} =
+      :gun.open(String.to_charlist(url.host), port, %{
+        protocols: [:http],
+        tls_opts: [
+          verify: :verify_none
+          # verify: :verify_peer,
+          # cacerts: :certifi.cacerts(),
+          # depth: 99,
+          # server_name_indication: url.host,
+          # reuse_sessions: false
+          # verify_fun: {&:ssl_verify_hostname.verify_fun/3, [check_hostname: url.host]}
+        ]
+      })
 
-    path =
-      case uri.query do
-        nil -> uri.path
-        query -> uri.path <> "?" <> query
-      end
-
-    with {:ok, conn} <- Mint.HTTP.connect(http_scheme, uri.host, uri.port),
-         {:ok, conn, ref} <- Mint.WebSocket.upgrade(ws_scheme, conn, path, []) do
-      state = %{state | conn: conn, request_ref: ref, caller: from}
-      {:noreply, state}
-    else
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-
-      {:error, conn, reason} ->
-        {:reply, {:error, reason}, put_in(state.conn, conn)}
-    end
+    {:ok, %{conn: conn, stream: nil, url: url, read_only: read_only}}
   end
 
   @impl GenServer
-  def handle_info(message, state) do
-    case Mint.WebSocket.stream(state.conn, message) do
-      {:ok, conn, responses} ->
-        state = put_in(state.conn, conn) |> handle_responses(responses)
-        if state.closing?, do: do_close(state), else: {:noreply, state}
+  def handle_cast({:send, msg}, state) do
+    :gun.ws_send(state.conn, state.stream, {:text, msg})
+    {:noreply, state}
+  end
 
-      {:error, conn, reason, _responses} ->
-        state = put_in(state.conn, conn) |> reply({:error, reason})
-        {:noreply, state}
+  @impl GenServer
+  def handle_call(:state, _from, state) do
+    {:reply, state, state}
+  end
 
-      :unknown ->
-        {:noreply, state}
+  @impl GenServer
+  def handle_info({:gun_up, conn, :http}, state) do
+    Logger.debug("Connection up #{state.url.host}")
+    stream = :gun.ws_upgrade(conn, state.url.path || "/")
+    {:noreply, %{state | conn: conn, stream: stream}}
+  end
+
+  def handle_info({:gun_upgrade, _conn, _stream, ["websocket"], _headers}, state) do
+    Logger.debug("WebSocket upgraded #{state.url.host}")
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_response, _conn, _stream, :nofin, status, _headers}, state) do
+    Logger.warning("Response #{status} #{state.url.host}")
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_data, _conn, _stream, :fin, _response}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_down, _conn, :ws, :closed, _headers}, state) do
+    Logger.warning("Connection down #{state.url.host}")
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_ws, _conn, _stream, {:text, message}}, state) do
+    Logger.debug("Message received")
+
+    message
+    |> Nostr.Message.parse()
+    |> case do
+      {:event, sub_id, event} ->
+        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}", event)
+
+      {:eose, sub_id} ->
+        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}", :eose)
+
+      {:notice, message} ->
+        Phoenix.PubSub.broadcast(Nostr.PubSub, "relays:#{state.url.host}", message)
     end
+
+    {:noreply, state}
   end
 
-  defp handle_responses(state, responses)
-
-  defp handle_responses(%{request_ref: ref} = state, [{:status, ref, status} | rest]) do
-    put_in(state.status, status)
-    |> handle_responses(rest)
-  end
-
-  defp handle_responses(%{request_ref: ref} = state, [{:headers, ref, resp_headers} | rest]) do
-    put_in(state.resp_headers, resp_headers)
-    |> handle_responses(rest)
-  end
-
-  defp handle_responses(%{request_ref: ref} = state, [{:done, ref} | rest]) do
-    case Mint.WebSocket.new(state.conn, ref, state.status, state.resp_headers) do
-      {:ok, conn, websocket} ->
-        %{state | conn: conn, websocket: websocket, status: nil, resp_headers: nil}
-        |> reply({:ok, :connected})
-        |> handle_responses(rest)
-
-      {:error, conn, reason} ->
-        put_in(state.conn, conn)
-        |> reply({:error, reason})
-    end
-  end
-
-  defp handle_responses(%{request_ref: ref, websocket: websocket} = state, [
-         {:data, ref, data} | rest
-       ])
-       when websocket != nil do
-    case Mint.WebSocket.decode(websocket, data) do
-      {:ok, websocket, frames} ->
-        put_in(state.websocket, websocket)
-        |> handle_frames(frames)
-        |> handle_responses(rest)
-
-      {:error, websocket, reason} ->
-        put_in(state.websocket, websocket)
-        |> reply({:error, reason})
-    end
-  end
-
-  defp handle_responses(state, [_response | rest]) do
-    handle_responses(state, rest)
-  end
-
-  defp handle_responses(state, []), do: state
-
-  defp send_frame(state, frame) do
-    with {:ok, websocket, data} <- Mint.WebSocket.encode(state.websocket, frame),
-         state = put_in(state.websocket, websocket),
-         {:ok, conn} <- Mint.WebSocket.stream_request_body(state.conn, state.request_ref, data) do
-      {:ok, put_in(state.conn, conn)}
-    else
-      {:error, %Mint.WebSocket{} = websocket, reason} ->
-        {:error, put_in(state.websocket, websocket), reason}
-
-      {:error, conn, reason} ->
-        {:error, put_in(state.conn, conn), reason}
-    end
-  end
-
-  def handle_frames(state, frames) do
-    Enum.reduce(frames, state, fn
-      # reply to pings with pongs
-      {:ping, data}, state ->
-        {:ok, state} = send_frame(state, {:pong, data})
-        state
-
-      {:close, _code, reason}, state ->
-        Logger.debug("Closing connection: #{inspect(reason)}")
-        %{state | closing?: true}
-
-      {:text, text}, state ->
-        Logger.debug("Received: #{inspect(text)}, sending back the reverse")
-        {:ok, state} = send_frame(state, {:text, String.reverse(text)})
-        state
-
-      frame, state ->
-        Logger.debug("Unexpected frame received: #{inspect(frame)}")
-        state
-    end)
-  end
-
-  defp do_close(state) do
-    # Streaming a close frame may fail if the server has already closed
-    # for writing.
-    _ = send_frame(state, :close)
-    Mint.HTTP.close(state.conn)
-    {:stop, :normal, state}
-  end
-
-  defp reply(state, response) do
-    if state.caller, do: GenServer.reply(state.caller, response)
-    put_in(state.caller, nil)
+  @impl GenServer
+  def terminate(_reason, state) do
+    :gun.shutdown(state.conn)
   end
 end

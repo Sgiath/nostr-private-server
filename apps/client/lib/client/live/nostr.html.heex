@@ -1,5 +1,39 @@
-<button phx-click="connect">Connect</button>
+<.button phx-click="connect">Connect</.button>
+<.button phx-click="disconnect">Disconnect</.button>
+<.button phx-click="request">Request</.button>
 
+<h1 class="text-[1.5rem] font-semibold">Connected relays</h1>
 <%= for r <- @relays do %>
-  <pre><%= inspect(r) %></pre>
+  <p class="ml-6"><%= r.url.host %></p>
+<% end %>
+
+<h2 class="text-[1.2rem] font-semibold mt-4">Metadata</h2>
+<pre><%= inspect(@metadata) %></pre>
+
+<h2 class="text-[1.2rem] font-semibold mt-4">Following</h2>
+<%= for f <- @following do %>
+  <code><%= f %></code>
+<% end %>
+
+<h2 class="text-[1.2rem] font-semibold mt-4">Notes</h2>
+<%= for {_id, e} <- @notes do %>
+  <p><%= e.content %></p>
+  <div class="ml-6">
+    <%= for t <- e.tags do %>
+      <pre><%= inspect(t) %></pre>
+    <% end %>
+  </div>
+  <br />
+<% end %>
+
+<h2 class="text-[1.2rem] font-semibold mt-4">Messages</h2>
+<%= for {_id, %{content: c, tags: [["p", r]]}} <- @messages do %>
+  <p><%= c %></p>
+  <p><em>Recipient:</em> <code><%= r %></code></p>
+  <br />
+<% end %>
+
+<h2 class="text-[1.2rem] font-semibold mt-4">Events</h2>
+<%= for {_id, e} <- @events do %>
+  <pre><%= inspect(e) %></pre>
 <% end %>

@@ -2,22 +2,15 @@ defmodule Nostr do
   use DynamicSupervisor
 
   def test do
-    Nostr.start_child("wss://relay.damus.io")
-
-    for {:undefined, pid, :worker, [_name]} <- DynamicSupervisor.which_children(Nostr) do
-      WebSockex.cast(
-        pid,
-        {:req, :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower),
-         %{
-           authors: ["0000002855ad7906a7568bf4d971d82056994aa67af3cf0048a825415ac90672"],
-           since: 0
-         }}
-      )
-    end
+    {:ok, pid} = Nostr.Connection.start_link(url: "wss://relay.damus.io")
+    Process.sleep(1000)
+    Nostr.Connection.req(pid, %Nostr.Filter{since: 0}, "test")
   end
 
   def connected_relays do
-    DynamicSupervisor.which_children(__MODULE__)
+    for {:undefined, pid, :worker, [_name]} <- DynamicSupervisor.which_children(Nostr) do
+      GenServer.call(pid, :state)
+    end
   end
 
   # Private API
@@ -27,7 +20,10 @@ defmodule Nostr do
   end
 
   def start_child(url, read_only \\ false) do
-    DynamicSupervisor.start_child(__MODULE__, {Nostr.Connection, url: url, read_only: read_only})
+    DynamicSupervisor.start_child(
+      __MODULE__,
+      {Nostr.Connection, [url: url, read_only: read_only]}
+    )
   end
 
   @impl DynamicSupervisor

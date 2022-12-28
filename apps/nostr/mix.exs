@@ -3,23 +3,25 @@ defmodule Nostr.MixProject do
 
   def project do
     [
+      # App config
       app: :nostr,
       version: "0.1.0",
-      build_path: "../../_build",
-      config_path: "../../config/config.exs",
-      deps_path: "../../deps",
-      lockfile: "../../mix.lock",
+
+      # Elixir config
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+
+      # Umbrella paths
+      build_path: "../../_build",
+      config_path: "../../config/config.exs",
+      deps_path: "../../deps",
+      lockfile: "../../mix.lock"
     ]
   end
 
-  # Configuration for the OTP application.
-  #
-  # Type `mix help compile.app` for more information.
   def application do
     [
       mod: {Nostr.Application, []},
@@ -27,13 +29,9 @@ defmodule Nostr.MixProject do
     ]
   end
 
-  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Specifies your project dependencies.
-  #
-  # Type `mix help deps` for examples and options.
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.1"},
@@ -42,15 +40,17 @@ defmodule Nostr.MixProject do
       {:jason, "~> 1.2"},
       {:swoosh, "~> 1.3"},
       {:finch, "~> 0.13"},
+
+      # Cryptography
       {:secp256k1, git: "https://git.sr.ht/~sgiath/secp256k1"},
-      {:mint_web_socket, "~> 1.0"},
-      {:castore, "~> 0.1"}
+
+      # HTTP client
+      {:gun, "~> 2.0.0-rc.2"},
+      {:certifi, "~> 2.10"},
+      {:ssl_verify_fun, "~> 1.1"}
     ]
   end
 
-  # Aliases are shortcuts or tasks specific to the current project.
-  #
-  # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
       setup: ["deps.get", "ecto.setup"],

@@ -69,9 +69,15 @@ config :phoenix, :json_library, Jason
 
 config :client,
   relays: [
-    "wss://relay.damus.io"
+    "wss://nostr-pub.wellorder.net",
+    "wss://nostr.onsats.org",
+    "wss://nostr-relay.wlvs.space",
+    "wss://nostr.bitcoiner.social",
+    "wss://relay.damus.io",
+    "wss://relay.nostr.info",
+    "wss://nostr-pub.semisol.dev"
   ],
-  read_only: []
+  pubkey: "0000002855ad7906a7568bf4d971d82056994aa67af3cf0048a825415ac90672"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
