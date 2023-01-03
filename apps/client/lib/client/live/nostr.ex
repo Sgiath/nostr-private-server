@@ -36,15 +36,19 @@ defmodule Client.Live.Nostr do
   end
 
   def handle_event("request", _value, socket) do
-    filter = %Nostr.Filter{
+    filter1 = %Nostr.Filter{
       authors: [Application.get_env(:client, :pubkey)],
+      since: 0
+    }
+    filter2 = %Nostr.Filter{
+      "#p": [Application.get_env(:client, :pubkey)],
       since: 0
     }
 
     sub_id = 32 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
 
     for {:undefined, pid, :worker, [_name]} <- DynamicSupervisor.which_children(Nostr) do
-      Task.start(fn -> Nostr.Connection.req(pid, filter, sub_id) end)
+      Task.start(fn -> Nostr.Connection.req(pid, [filter1, filter2], sub_id) end)
       state = GenServer.call(pid, :state)
       Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}")
     end

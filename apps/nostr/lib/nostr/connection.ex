@@ -18,7 +18,7 @@ defmodule Nostr.Connection do
     GenServer.cast(pid, {:send, msg})
   end
 
-  def req(pid, %Nostr.Filter{} = filter, sub_id) do
+  def req(pid, filter, sub_id) do
     msg =
       filter
       |> Nostr.Message.request(sub_id)

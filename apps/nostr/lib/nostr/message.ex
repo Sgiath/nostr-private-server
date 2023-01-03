@@ -5,6 +5,7 @@ defmodule Nostr.Message do
 
   def create_event(%Nostr.Event{} = event), do: {:event, event}
   def request(%Nostr.Filter{} = filter, sub_id), do: {:req, sub_id, filter}
+  def request(filters, sub_id), do: {:req, sub_id, filters}
   def close(sub_id), do: {:close, sub_id}
   def event(%Nostr.Event{} = event, sub_id), do: {:event, sub_id, event}
   def notice(message), do: {:notice, message}
@@ -13,6 +14,7 @@ defmodule Nostr.Message do
   def serialize(message) when is_tuple(message) do
     message
     |> Tuple.to_list()
+    |> List.flatten()
     |> then(fn [name | rest] -> [name |> Atom.to_string() |> String.upcase() | rest] end)
     |> Jason.encode!()
   end
