@@ -31,8 +31,8 @@
 <% end %>
 
 <h2>Messages</h2>
-<%= for {_id, %{content: c, tags: [["p", r]]}} <- @messages do %>
-  <p><%= c %></p>
+<%= for {_id, %{content: c, tags: [{:p, r, []} | _rest]}} <- @messages do %>
+  <pre><%= inspect(c, pretty: true) %></pre>
   <p><em>Recipient:</em> <code><%= r %></code></p>
   <br />
 <% end %>

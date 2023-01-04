@@ -102,7 +102,7 @@ defmodule Nostr.Connection do
   end
 
   def handle_info({:gun_ws, _conn, _stream, {:text, message}}, state) do
-    Logger.debug("Message received")
+    # Logger.debug("Message received")
 
     message
     |> Nostr.Message.parse()
@@ -114,7 +114,11 @@ defmodule Nostr.Connection do
         Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}", :eose)
 
       {:notice, message} ->
-        Phoenix.PubSub.broadcast(Nostr.PubSub, "relays:#{state.url.host}", message)
+        Phoenix.PubSub.broadcast(
+          Nostr.PubSub,
+          "relays:#{state.url.host}",
+          {:notice, message, state.url.host}
+        )
     end
 
     {:noreply, state}

@@ -3,7 +3,21 @@ defmodule Nostr.Event do
   Nostr Event
   """
 
-  defstruct [:id, :pubkey, :kind, :tags, :created_at, :content, :sig]
+  @dialyzer {:no_return, correct_sig?: 1}
+
+  @enforce_keys [:id, :pubkey, :kind, :tags, :created_at, :content, :sig]
+  defstruct id: nil, pubkey: nil, kind: nil, tags: [], created_at: nil, content: "", sig: nil
+
+  @typedoc "Nostr event"
+  @type t() :: %__MODULE__{
+          id: <<_::32, _::_*8>>,
+          pubkey: <<_::32, _::_*8>>,
+          kind: non_neg_integer(),
+          tags: [[String.t()]],
+          created_at: DateTime.t(),
+          content: String.t(),
+          sig: <<_::64, _::_*8>>
+        }
 
   def parse(event) when is_map(event) do
     if correct_id?(event) and correct_sig?(event) do
@@ -11,12 +25,16 @@ defmodule Nostr.Event do
         id: event.id,
         pubkey: event.pubkey,
         kind: event.kind,
-        tags: event.tags,
-        created_at: event.created_at,
+        tags: parse_tags(event.tags),
+        created_at: DateTime.from_unix!(event.created_at),
         content: event.content,
         sig: event.sig
       }
     end
+  end
+
+  def parse_tags(tags) do
+    Enum.map(tags, fn [type, data | rest] -> {String.to_atom(type), data, rest} end)
   end
 
   def correct_id?(%{id: id} = event) do
@@ -56,7 +74,7 @@ defimpl Jason.Encoder, for: Nostr.Event do
         pubkey: event.pubkey,
         kind: event.kind,
         tags: event.tags,
-        created_at: event.created_at,
+        created_at: DateTime.to_unix(event.created_at),
         content: event.content,
         sig: event.sig
       },

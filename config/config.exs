@@ -81,8 +81,7 @@ config :client,
     "wss://nostr.onsats.org",
     "wss://nostr-pub.semisol.dev",
     "wss://nostr.ono.re"
-  ],
-  pubkey: "0000002855ad7906a7568bf4d971d82056994aa67af3cf0048a825415ac90672"
+  ]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
