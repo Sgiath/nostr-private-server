@@ -10,15 +10,9 @@ defmodule Client.Application do
       Client.Telemetry,
       # Start the Endpoint (http/https)
       Client.Endpoint
-      # Start a worker by calling: Client.Worker.start_link(arg)
-      # {Client.Worker, arg}
-      # {Client.Connection, "wss://relay.damus.io"}
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Client.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(children, strategy: :one_for_one, name: Client.Supervisor)
   end
 
   # Tell Phoenix to update the endpoint configuration

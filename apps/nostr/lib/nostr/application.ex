@@ -6,9 +6,7 @@ defmodule Nostr.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Nostr.Repo,
       {Phoenix.PubSub, name: Nostr.PubSub},
-      {Finch, name: Nostr.Finch},
       Nostr
     ]
 
