@@ -10,6 +10,7 @@ defmodule Client.Live.Nostr do
     {:ok,
      assign(socket, %{
        relays: Nostr.Client.get_cons(),
+       subscriptions: Nostr.Client.get_subs(),
        metadata: %{},
        following: MapSet.new(),
        notes: [],
@@ -55,7 +56,7 @@ defmodule Client.Live.Nostr do
     Nostr.Client.start_sub(sub_id, [filter1, filter2])
     Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{sub_id}")
 
-    {:noreply, socket}
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
   end
 
   @impl true

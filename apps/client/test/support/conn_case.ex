@@ -31,8 +31,7 @@ defmodule Client.ConnCase do
     end
   end
 
-  setup tags do
-    Nostr.DataCase.setup_sandbox(tags)
+  setup do
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

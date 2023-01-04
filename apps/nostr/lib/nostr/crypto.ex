@@ -4,6 +4,7 @@ defmodule Nostr.Crypto do
   """
 
   @dialyzer {:no_return, encrypt: 3, decrypt: 3, shared_secret: 2}
+  @dialyzer {:no_unused, d64: 1, e64: 1}
 
   def encrypt(message, seckey, pubkey) do
     iv = :crypto.strong_rand_bytes(16)
