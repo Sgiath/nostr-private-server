@@ -20,8 +20,9 @@
 <% end %>
 
 <h2>Notes</h2>
-<%= for {_id, e} <- @notes do %>
+<%= for e <- @notes do %>
   <p><%= e.content %></p>
+  <p>Created at: <%= DateTime.to_iso8601(e.created_at) %></p>
   <div class="ml-6">
     <%= for t <- e.tags do %>
       <pre><%= inspect(t) %></pre>
@@ -31,13 +32,14 @@
 <% end %>
 
 <h2>Messages</h2>
-<%= for {_id, %{content: c, tags: [{:p, r, []} | _rest]}} <- @messages do %>
+<%= for %{created_at: date, content: c, tags: [{:p, r, []} | _rest]} <- @messages do %>
   <pre><%= inspect(c, pretty: true) %></pre>
+  <p>Send at: <%= DateTime.to_iso8601(date) %></p>
   <p><em>Recipient:</em> <code><%= r %></code></p>
   <br />
 <% end %>
 
 <h2>Other Events</h2>
-<%= for {_id, e} <- @events do %>
+<%= for e <- @events do %>
   <pre><%= inspect(e) %></pre>
 <% end %>

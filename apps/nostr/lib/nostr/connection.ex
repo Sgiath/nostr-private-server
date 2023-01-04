@@ -7,35 +7,6 @@ defmodule Nostr.Connection do
     GenServer.start_link(__MODULE__, opts)
   end
 
-  # Nostr requests
-
-  def event(pid, %Nostr.Event{} = event) do
-    msg =
-      event
-      |> Nostr.Message.create_event()
-      |> Nostr.Message.serialize()
-
-    GenServer.cast(pid, {:send, msg})
-  end
-
-  def req(pid, filter, sub_id) do
-    msg =
-      filter
-      |> Nostr.Message.request(sub_id)
-      |> Nostr.Message.serialize()
-
-    GenServer.cast(pid, {:send, msg})
-  end
-
-  def close(pid, sub_id) do
-    msg =
-      sub_id
-      |> Nostr.Message.close()
-      |> Nostr.Message.serialize()
-
-    GenServer.cast(pid, {:send, msg})
-  end
-
   # Private API
 
   @impl GenServer
@@ -108,10 +79,10 @@ defmodule Nostr.Connection do
     |> Nostr.Message.parse()
     |> case do
       {:event, sub_id, event} ->
-        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}", event)
+        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{sub_id}", event)
 
       {:eose, sub_id} ->
-        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}", :eose)
+        Phoenix.PubSub.broadcast(Nostr.PubSub, "events:#{sub_id}", :eose)
 
       {:notice, message} ->
         Phoenix.PubSub.broadcast(

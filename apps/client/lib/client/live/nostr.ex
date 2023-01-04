@@ -11,17 +11,17 @@ defmodule Client.Live.Nostr do
      assign(socket, %{
        relays: Nostr.connected_relays(),
        metadata: %{},
-       following: [],
-       notes: %{},
-       events: %{},
-       messages: %{}
+       following: MapSet.new(),
+       notes: [],
+       events: [],
+       messages: []
      })}
   end
 
   @impl true
   def handle_event("connect", _value, socket) do
     for url <- Client.Config.relays() do
-      {:ok, pid} = Nostr.start_child(url)
+      {:ok, pid} = Nostr.add_server(url)
       state = GenServer.call(pid, :state)
       Phoenix.PubSub.subscribe(Nostr.PubSub, "relays:#{state.url.host}")
     end
@@ -50,11 +50,8 @@ defmodule Client.Live.Nostr do
 
     sub_id = 32 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
 
-    for {:undefined, pid, :worker, [_name]} <- DynamicSupervisor.which_children(Nostr) do
-      Task.start(fn -> Nostr.Connection.req(pid, [filter1, filter2], sub_id) end)
-      state = GenServer.call(pid, :state)
-      Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{state.url.host}:#{sub_id}")
-    end
+    Nostr.req([filter1, filter2], sub_id)
+    Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{sub_id}")
 
     {:noreply, assign(socket, :relays, Nostr.connected_relays())}
   end
@@ -66,18 +63,28 @@ defmodule Client.Live.Nostr do
   end
 
   # Handle note
-  def handle_info(%Nostr.Event{id: id, kind: 1} = event, socket) do
-    {:noreply, assign(socket, :notes, Map.put(socket.assigns.notes, id, event))}
+  def handle_info(%Nostr.Event{kind: 1} = event, socket) do
+    {:noreply, assign(socket, :notes, sort([event | socket.assigns.notes]))}
   end
 
   # Handle following
-  def handle_info(%Nostr.Event{kind: 3, tags: tags}, socket) do
-    {:noreply, assign(socket, :following, Enum.map(tags, &elem(&1, 1)))}
+  def handle_info(%Nostr.Event{pubkey: p, kind: 3, tags: tags}, socket) do
+    if p == Client.Config.pubkey() do
+      f =
+        MapSet.union(
+          socket.assigns.following,
+          tags |> Enum.map(&elem(&1, 1)) |> Enum.into(MapSet.new())
+        )
+
+      {:noreply, assign(socket, :following, f)}
+    else
+      {:noreply, socket}
+    end
   end
 
   # Handle encrypted message
   def handle_info(
-        %Nostr.Event{id: id, pubkey: pubkey, kind: 4, content: content, tags: tags} = event,
+        %Nostr.Event{pubkey: pubkey, kind: 4, content: content, tags: tags} = event,
         socket
       ) do
     seckey = Client.Config.seckey()
@@ -99,12 +106,12 @@ defmodule Client.Live.Nostr do
         plain_text: Nostr.Crypto.decrypt(content, seckey, pubkey)
       })
 
-    {:noreply, assign(socket, :messages, Map.put(socket.assigns.messages, id, event))}
+    {:noreply, assign(socket, :messages, sort([event | socket.assigns.messages]))}
   end
 
   # Handle other events
-  def handle_info(%Nostr.Event{id: id} = event, socket) do
-    {:noreply, assign(socket, :events, Map.put(socket.assigns.events, id, event))}
+  def handle_info(%Nostr.Event{} = event, socket) do
+    {:noreply, assign(socket, :events, sort([event | socket.assigns.events]))}
   end
 
   # Handle end of stream events
@@ -116,5 +123,13 @@ defmodule Client.Live.Nostr do
   def handle_info({:notice, message, server}, socket) do
     Logger.warning("Received notice from server #{server}: #{message}")
     {:noreply, socket}
+  end
+
+  defp sort(events) do
+    events
+    |> Enum.uniq_by(fn %Nostr.Event{id: id} -> id end)
+    |> Enum.sort(fn %Nostr.Event{created_at: c1}, %Nostr.Event{created_at: c2} ->
+      DateTime.compare(c1, c2) == :gt
+    end)
   end
 end
