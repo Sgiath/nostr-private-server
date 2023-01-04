@@ -27,9 +27,10 @@ defmodule Nostr.Client do
   @doc """
   Start new subscription
   """
-  @spec start_sub(id :: String.t(), filters :: [Nostr.Filter.t()]) :: :ok
-  def start_sub(id, filters) do
-    GenServer.cast(__MODULE__, {:start_sub, id, filters})
+  @spec start_sub(id :: String.t(), filters :: [Nostr.Filter.t()], relays :: :all | [String.t()]) ::
+          :ok
+  def start_sub(id, filters, relays \\ :all) do
+    GenServer.cast(__MODULE__, {:start_sub, id, filters, relays, [self()]})
   end
 
   @doc """
@@ -59,7 +60,7 @@ defmodule Nostr.Client do
     initial_relays = Keyword.get(opts, :initial_relays, [])
 
     state = %{
-      connections: [],
+      connections: %{},
       subscriptions: %{}
     }
 
@@ -68,14 +69,15 @@ defmodule Nostr.Client do
 
   @impl GenServer
   def handle_continue(initial_relays, state) do
-    DynamicSupervisor.start_link(name: Nostr.Client.DynamicSupervisor)
+    DynamicSupervisor.start_link(name: Nostr.Client.Connections)
+    DynamicSupervisor.start_link(name: Nostr.Client.Subscriptions)
 
     connections =
       initial_relays
       |> Enum.map(fn url ->
         {:ok, pid} =
           DynamicSupervisor.start_child(
-            Nostr.Client.DynamicSupervisor,
+            Nostr.Client.Connections,
             {Nostr.Connection, [url: url, read_only: false]}
           )
 
@@ -103,7 +105,7 @@ defmodule Nostr.Client do
     else
       {:ok, pid} =
         DynamicSupervisor.start_child(
-          Nostr.Client.DynamicSupervisor,
+          Nostr.Client.Connections,
           {Nostr.Connection, [url: url, read_only: read_only]}
         )
 
@@ -117,9 +119,43 @@ defmodule Nostr.Client do
       |> Map.get(url)
       |> Map.get(:pid)
 
-    DynamicSupervisor.terminate_child(Nostr.Client.DynamicSupervisor, pid)
+    DynamicSupervisor.terminate_child(Nostr.Client.Connections, pid)
 
     {:noreply, Map.update!(state, :connections, &Map.delete(&1, url))}
+  end
+
+  def handle_cast({:start_sub, id, filters, :all, subs}, state) do
+    {:ok, pid} =
+      DynamicSupervisor.start_child(
+        Nostr.Client.Subscriptions,
+        {Nostr.Subscription, [id: id, filters: filters, relays: state.connections, subscribers: subs]}
+      )
+
+    {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
+  end
+
+  def handle_cast({:start_sub, id, filters, relays, subs}, state) do
+    relays = Map.filter(state.connections, fn {url, _val} -> url in relays end)
+
+    {:ok, pid} =
+      DynamicSupervisor.start_child(
+        Nostr.Client.Subscriptions,
+        {Nostr.Subscription, [id: id, filters: filters, relays: relays, subscribers: subs]}
+      )
+
+    {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
+  end
+
+  def handle_cast({:close_sub, id}, state) do
+    pid =
+      state.subscriptions
+      |> Map.get(id)
+      |> Map.get(:pid)
+
+    GenServer.call(pid, :close)
+    DynamicSupervisor.terminate_child(Nostr.Client.Subscriptions, pid)
+
+    {:noreply, Map.update!(state, :subscriptions, &Map.delete(&1, id))}
   end
 
   def handle_cast({:publish_event, event}, state) do
@@ -131,27 +167,9 @@ defmodule Nostr.Client do
     {:noreply, state}
   end
 
-  def handle_cast({:start_sub, id, filters}, state) do
-    filters
-    |> Nostr.Message.request(id)
-    |> Nostr.Message.serialize()
-    |> send_msg()
-
-    {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{filters: filters}))}
-  end
-
-  def handle_cast({:close_sub, id}, state) do
-    id
-    |> Nostr.Message.close()
-    |> Nostr.Message.serialize()
-    |> send_msg()
-
-    {:noreply, Map.update!(state, :subscriptions, &Map.delete(&1, id))}
-  end
-
   defp send_msg(msg) do
     for {:undefined, pid, :worker, [Nostr.Connection]} <-
-          DynamicSupervisor.which_children(Nostr.Client.DynamicSupervisor) do
+          DynamicSupervisor.which_children(Nostr.Client.Connections) do
       GenServer.cast(pid, {:send, msg})
     end
   end

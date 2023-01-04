@@ -5,8 +5,6 @@ defmodule Client.Live.Nostr do
 
   @impl true
   def mount(_params, _args, socket) do
-    Phoenix.PubSub.subscribe(Nostr.PubSub, "events:test")
-
     {:ok,
      assign(socket, %{
        relays: Nostr.Client.get_cons(),
@@ -25,19 +23,19 @@ defmodule Client.Live.Nostr do
       Nostr.Client.add_relay(url)
     end
 
-    relays = Nostr.Client.get_cons()
-
-    for {url, _state} <- relays do
-      Phoenix.PubSub.subscribe(Nostr.PubSub, "relays:#{url}")
-    end
-
-    {:noreply, assign(socket, :relays, relays)}
+    {:noreply, assign(socket, :relays, Nostr.Client.get_cons())}
   end
 
   def handle_event("disconnect", %{"url" => url}, socket) do
     Nostr.Client.disconnect_relay(url)
 
     {:noreply, assign(socket, :relays, Nostr.Client.get_cons())}
+  end
+
+  def handle_event("close", %{"sub-id" => id}, socket) do
+    Nostr.Client.close_sub(id)
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
   end
 
   def handle_event("request", _value, socket) do
@@ -54,7 +52,58 @@ defmodule Client.Live.Nostr do
     sub_id = 32 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
 
     Nostr.Client.start_sub(sub_id, [filter1, filter2])
-    Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{sub_id}")
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
+  end
+
+  def handle_event("request-profile", _value, socket) do
+    filter = %Nostr.Filter{
+      authors: [Client.Config.pubkey()],
+      kinds: [0]
+    }
+
+    Nostr.Client.start_sub("profile", [filter])
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
+  end
+
+  def handle_event("request-following", _value, socket) do
+    filter = %Nostr.Filter{
+      authors: [Client.Config.pubkey()],
+      kinds: [3]
+    }
+
+    Nostr.Client.start_sub("following", [filter])
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
+  end
+
+  def handle_event("request-notes", _value, socket) do
+    my_notes = %Nostr.Filter{
+      authors: [Client.Config.pubkey()],
+      kinds: [1]
+    }
+    mentions = %Nostr.Filter{
+      "#p": [Client.Config.pubkey()],
+      kinds: [1]
+    }
+
+    Nostr.Client.start_sub("notes", [my_notes, mentions])
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
+  end
+
+  def handle_event("request-messages", _value, socket) do
+    my_messages = %Nostr.Filter{
+      authors: [Client.Config.pubkey()],
+      kinds: [4]
+    }
+    replies = %Nostr.Filter{
+      "#p": [Client.Config.pubkey()],
+      kinds: [4]
+    }
+
+    Nostr.Client.start_sub("messages", [my_messages, replies])
 
     {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
   end
