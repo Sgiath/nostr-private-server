@@ -3,7 +3,8 @@ defmodule Nostr.Event do
   Nostr Event
   """
 
-  @dialyzer {:no_return, correct_sig?: 1}
+  alias Nostr.Event.Parser
+  alias Nostr.Event.Validator
 
   @enforce_keys [:id, :pubkey, :kind, :tags, :created_at, :content, :sig]
   defstruct id: nil, pubkey: nil, kind: nil, tags: [], created_at: nil, content: "", sig: nil
@@ -20,33 +21,9 @@ defmodule Nostr.Event do
         }
 
   def parse(event) when is_map(event) do
-    if correct_id?(event) and correct_sig?(event) do
-      %__MODULE__{
-        id: event.id,
-        pubkey: event.pubkey,
-        kind: event.kind,
-        tags: parse_tags(event.tags),
-        created_at: DateTime.from_unix!(event.created_at),
-        content: event.content,
-        sig: event.sig
-      }
-    end
-  end
+    event = Parser.parse(event)
 
-  def parse_tags(tags) do
-    Enum.map(tags, fn [type, data | rest] -> {String.to_atom(type), data, rest} end)
-  end
-
-  def correct_id?(%{id: id} = event) do
-    compute_id(event) == id
-  end
-
-  def correct_sig?(%{id: id, sig: sig, pubkey: pubkey}) do
-    Secp256k1.schnorr_valid?(
-      Base.decode16!(sig, case: :lower),
-      Base.decode16!(id, case: :lower),
-      Base.decode16!(pubkey, case: :lower)
-    )
+    if Validator.valid?(event), do: event
   end
 
   def compute_id(event) do
@@ -55,14 +32,14 @@ defmodule Nostr.Event do
     |> Base.encode16(case: :lower)
   end
 
-  def serialize(%{
+  def serialize(%__MODULE__{
         pubkey: pubkey,
         kind: kind,
         tags: tags,
         created_at: created_at,
         content: content
       }) do
-    Jason.encode!([0, pubkey, created_at, kind, tags, content])
+    Jason.encode!([0, pubkey, DateTime.to_unix(created_at), kind, tags, content])
   end
 end
 

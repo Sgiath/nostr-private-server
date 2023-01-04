@@ -1,17 +1,23 @@
-<.button phx-click="connect">Connect</.button>
-<.button phx-click="disconnect">Disconnect</.button>
-<.button phx-click="request">Request</.button>
+<.button phx-click="connect">Connect all configured relays</.button>
+<.button phx-click="request">Request data</.button>
 
 <h1>Connected relays</h1>
-<%= for r <- @relays do %>
-  <p class="ml-6"><%= r.url.host %></p>
+<%= for {url, _state} <- @relays do %>
+  <p class="ml-6">
+    <.button class="py-1 px-2 my-1 mx-1" phx-click="disconnect" phx-value-url={url}>
+      Disconnect
+    </.button>
+    <%= url %>
+  </p>
 <% end %>
 
 <%= if Map.has_key?(@metadata, "name") do %>
   <h2><%= @metadata["name"] %> <%= @metadata["nip05"] %></h2>
   <img class="rounded-full w-24 h-24" src={@metadata["picture"]} alt="Profile picture" />
   <h3>About</h3>
-  <p><%= @metadata["about"] %></p>
+  <%= for line <- String.split(@metadata["about"], "\n") do %>
+    <p><%= line %></p>
+  <% end %>
 <% end %>
 
 <h2>Following</h2>
@@ -32,7 +38,7 @@
 <% end %>
 
 <h2>Messages</h2>
-<%= for %{created_at: date, content: c, tags: [{:p, r, []} | _rest]} <- @messages do %>
+<%= for %{created_at: date, content: c, tags: [%Nostr.Tag{type: :p, data: r} | _rest]} <- @messages do %>
   <pre><%= inspect(c, pretty: true) %></pre>
   <p>Send at: <%= DateTime.to_iso8601(date) %></p>
   <p><em>Recipient:</em> <code><%= r %></code></p>

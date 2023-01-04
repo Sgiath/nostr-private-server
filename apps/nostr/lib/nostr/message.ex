@@ -3,6 +3,8 @@ defmodule Nostr.Message do
   Nostr message
   """
 
+  require Logger
+
   def create_event(%Nostr.Event{} = event), do: {:event, event}
   def request(%Nostr.Filter{} = filter, sub_id), do: {:req, sub_id, filter}
   def request(filters, sub_id), do: {:req, sub_id, filters}
@@ -49,6 +51,7 @@ defmodule Nostr.Message do
   end
 
   def parse(message) do
-    IO.inspect(message, label: "Unknown message")
+    Logger.warning("Parsing unknown message: #{inspect(message)}")
+    :error
   end
 end

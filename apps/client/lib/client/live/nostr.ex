@@ -9,7 +9,7 @@ defmodule Client.Live.Nostr do
 
     {:ok,
      assign(socket, %{
-       relays: Nostr.connected_relays(),
+       relays: Nostr.Client.get_cons(),
        metadata: %{},
        following: MapSet.new(),
        notes: [],
@@ -21,20 +21,22 @@ defmodule Client.Live.Nostr do
   @impl true
   def handle_event("connect", _value, socket) do
     for url <- Client.Config.relays() do
-      {:ok, pid} = Nostr.add_server(url)
-      state = GenServer.call(pid, :state)
-      Phoenix.PubSub.subscribe(Nostr.PubSub, "relays:#{state.url.host}")
+      Nostr.Client.add_relay(url)
     end
 
-    {:noreply, assign(socket, :relays, Nostr.connected_relays())}
+    relays = Nostr.Client.get_cons()
+
+    for {url, _state} <- relays do
+      Phoenix.PubSub.subscribe(Nostr.PubSub, "relays:#{url}")
+    end
+
+    {:noreply, assign(socket, :relays, relays)}
   end
 
-  def handle_event("disconnect", _value, socket) do
-    for {:undefined, pid, :worker, [_name]} <- DynamicSupervisor.which_children(Nostr) do
-      DynamicSupervisor.terminate_child(Nostr, pid)
-    end
+  def handle_event("disconnect", %{"url" => url}, socket) do
+    Nostr.Client.disconnect_relay(url)
 
-    {:noreply, assign(socket, :relays, Nostr.connected_relays())}
+    {:noreply, assign(socket, :relays, Nostr.Client.get_cons())}
   end
 
   def handle_event("request", _value, socket) do
@@ -50,10 +52,10 @@ defmodule Client.Live.Nostr do
 
     sub_id = 32 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
 
-    Nostr.req([filter1, filter2], sub_id)
+    Nostr.Client.start_sub(sub_id, [filter1, filter2])
     Phoenix.PubSub.subscribe(Nostr.PubSub, "events:#{sub_id}")
 
-    {:noreply, assign(socket, :relays, Nostr.connected_relays())}
+    {:noreply, socket}
   end
 
   @impl true
@@ -73,7 +75,7 @@ defmodule Client.Live.Nostr do
       f =
         MapSet.union(
           socket.assigns.following,
-          tags |> Enum.map(&elem(&1, 1)) |> Enum.into(MapSet.new())
+          tags |> Enum.map(&Map.get(&1, :data)) |> Enum.into(MapSet.new())
         )
 
       {:noreply, assign(socket, :following, f)}
@@ -93,7 +95,7 @@ defmodule Client.Live.Nostr do
     pubkey =
       if pubkey == my_pubkey do
         Enum.find_value(tags, fn
-          {:p, pubkey, []} -> pubkey
+          %Nostr.Tag{type: :p, data: pubkey} -> pubkey
           _ -> false
         end)
       else

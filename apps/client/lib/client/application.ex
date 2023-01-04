@@ -9,7 +9,9 @@ defmodule Client.Application do
       # Start the Telemetry supervisor
       Client.Telemetry,
       # Start the Endpoint (http/https)
-      Client.Endpoint
+      Client.Endpoint,
+      # Start Nostr client
+      {Nostr.Client, initial_relays: Client.Config.relays()}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Client.Supervisor)

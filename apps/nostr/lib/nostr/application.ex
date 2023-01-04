@@ -6,8 +6,7 @@ defmodule Nostr.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Phoenix.PubSub, name: Nostr.PubSub},
-      Nostr
+      {Phoenix.PubSub, name: Nostr.PubSub}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Nostr.Supervisor)
