@@ -2,20 +2,24 @@
 <.button phx-click="disconnect">Disconnect</.button>
 <.button phx-click="request">Request</.button>
 
-<h1 class="text-[1.5rem] font-semibold">Connected relays</h1>
+<h1>Connected relays</h1>
 <%= for r <- @relays do %>
   <p class="ml-6"><%= r.url.host %></p>
 <% end %>
 
-<h2 class="text-[1.2rem] font-semibold mt-4">Metadata</h2>
-<pre><%= inspect(@metadata) %></pre>
+<%= if Map.has_key?(@metadata, "name") do %>
+  <h2><%= @metadata["name"] %> <%= @metadata["nip05"] %></h2>
+  <img class="rounded-full w-24 h-24" src={@metadata["picture"]} alt="Profile picture" />
+  <h3>About</h3>
+  <p><%= @metadata["about"] %></p>
+<% end %>
 
-<h2 class="text-[1.2rem] font-semibold mt-4">Following</h2>
+<h2>Following</h2>
 <%= for f <- @following do %>
   <code><%= f %></code>
 <% end %>
 
-<h2 class="text-[1.2rem] font-semibold mt-4">Notes</h2>
+<h2>Notes</h2>
 <%= for {_id, e} <- @notes do %>
   <p><%= e.content %></p>
   <div class="ml-6">
@@ -26,14 +30,14 @@
   <br />
 <% end %>
 
-<h2 class="text-[1.2rem] font-semibold mt-4">Messages</h2>
+<h2>Messages</h2>
 <%= for {_id, %{content: c, tags: [["p", r]]}} <- @messages do %>
   <p><%= c %></p>
   <p><em>Recipient:</em> <code><%= r %></code></p>
   <br />
 <% end %>
 
-<h2 class="text-[1.2rem] font-semibold mt-4">Events</h2>
+<h2>Other Events</h2>
 <%= for {_id, e} <- @events do %>
   <pre><%= inspect(e) %></pre>
 <% end %>

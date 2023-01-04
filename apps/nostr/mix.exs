@@ -44,7 +44,7 @@ defmodule Nostr.MixProject do
       # Cryptography
       {:secp256k1, git: "https://git.sr.ht/~sgiath/secp256k1"},
 
-      # HTTP client
+      # WebSocket client
       {:gun, "~> 2.0.0-rc.2"},
       {:certifi, "~> 2.10"},
       {:ssl_verify_fun, "~> 1.1"}

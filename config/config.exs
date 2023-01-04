@@ -70,12 +70,17 @@ config :phoenix, :json_library, Jason
 config :client,
   relays: [
     "wss://nostr-pub.wellorder.net",
-    "wss://nostr.onsats.org",
+    "wss://nostr-verified.wellorder.net",
     "wss://nostr-relay.wlvs.space",
-    "wss://nostr.bitcoiner.social",
+    "wss://nostr.openchain.fr",
     "wss://relay.damus.io",
     "wss://relay.nostr.info",
-    "wss://nostr-pub.semisol.dev"
+    "wss://relay.minds.com/nostr/v1/ws",
+    "wss://nostr.oxtr.dev",
+    "wss://nostr.bitcoiner.social",
+    "wss://nostr.onsats.org",
+    "wss://nostr-pub.semisol.dev",
+    "wss://nostr.ono.re"
   ],
   pubkey: "0000002855ad7906a7568bf4d971d82056994aa67af3cf0048a825415ac90672"
 

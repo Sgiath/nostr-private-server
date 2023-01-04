@@ -53,15 +53,7 @@ defmodule Nostr.Connection do
     {:ok, conn} =
       :gun.open(String.to_charlist(url.host), port, %{
         protocols: [:http],
-        tls_opts: [
-          verify: :verify_none
-          # verify: :verify_peer,
-          # cacerts: :certifi.cacerts(),
-          # depth: 99,
-          # server_name_indication: url.host,
-          # reuse_sessions: false
-          # verify_fun: {&:ssl_verify_hostname.verify_fun/3, [check_hostname: url.host]}
-        ]
+        tls_opts: [verify: :verify_none]
       })
 
     {:ok, %{conn: conn, stream: nil, url: url, read_only: read_only}}
@@ -90,17 +82,22 @@ defmodule Nostr.Connection do
     {:noreply, state}
   end
 
-  def handle_info({:gun_response, _conn, _stream, :nofin, status, _headers}, state) do
+  def handle_info({:gun_response, _conn, _stream, _fin, status, _headers}, state) do
     Logger.warning("Response #{status} #{state.url.host}")
     {:noreply, state}
   end
 
-  def handle_info({:gun_data, _conn, _stream, :fin, _response}, state) do
+  def handle_info({:gun_data, _conn, _stream, _fin, _response}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_down, _conn, :http, :closed, _headers}, state) do
+    Logger.warning("HTTP connection down #{state.url.host}")
     {:noreply, state}
   end
 
   def handle_info({:gun_down, _conn, :ws, :closed, _headers}, state) do
-    Logger.warning("Connection down #{state.url.host}")
+    Logger.warning("WebSocket connection down #{state.url.host}")
     {:noreply, state}
   end
 
