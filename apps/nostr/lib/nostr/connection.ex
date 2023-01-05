@@ -50,6 +50,10 @@ defmodule Nostr.Connection do
     {:noreply, state}
   end
 
+  def handle_cast({:notice_handler, handler}, state) do
+    {:noreply, Map.put(state, :notice_handler, handler)}
+  end
+
   @impl GenServer
   def handle_call(:state, _from, state) do
     {:reply, state, state}

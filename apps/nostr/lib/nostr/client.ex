@@ -34,6 +34,14 @@ defmodule Nostr.Client do
   end
 
   @doc """
+  Subscribe to incoming events from subscription
+  """
+  @spec subscribe_sub(id :: String.t(), pid :: pid()) :: :ok
+  def subscribe_sub(id, pid) do
+    GenServer.cast({:global, {:subscription, id}}, {:subscribe, pid})
+  end
+
+  @doc """
   Close subscription
   """
   @spec close_sub(id :: String.t()) :: :ok
@@ -44,17 +52,29 @@ defmodule Nostr.Client do
   @doc """
   Get active subscriptions
   """
-  @spec get_subs() :: []
+  @spec get_subs() :: [map()]
   def get_subs do
     GenServer.call(__MODULE__, :get_subscriptions)
   end
 
+  @doc """
+  Get active connections
+  """
+  @spec get_cons() :: [map()]
   def get_cons do
     GenServer.call(__MODULE__, :get_connections)
   end
 
+  @doc """
+  Get all received events from subscription
+  """
+  @spec get_events(id :: String.t()) :: [Nostr.Event.t()]
   def get_events(id) do
     GenServer.call({:global, {:subscription, id}}, :events)
+  end
+
+  def change_notice_handler(handler) do
+    GenServer.cast(__MODULE__, {:notice_handler, handler})
   end
 
   # Internals
@@ -62,10 +82,12 @@ defmodule Nostr.Client do
   @impl GenServer
   def init(opts) do
     initial_relays = Keyword.get(opts, :initial_relays, [])
+    notice_handler = Keyword.get(opts, :notice_handler, &Logger.error("Notice from #{&2}: #{&1}"))
 
     state = %{
       connections: %{},
-      subscriptions: %{}
+      subscriptions: %{},
+      notice_handler: notice_handler
     }
 
     {:ok, state, {:continue, initial_relays}}
@@ -82,7 +104,7 @@ defmodule Nostr.Client do
         {:ok, pid} =
           DynamicSupervisor.start_child(
             Nostr.Client.Connections,
-            {Nostr.Connection, [url: url, read_only: false]}
+            {Nostr.Connection, [url: url, read_only: false, notice_handler: state.notice_handler]}
           )
 
         {url, %{pid: pid}}
@@ -94,11 +116,23 @@ defmodule Nostr.Client do
 
   @impl GenServer
   def handle_call(:get_subscriptions, _from, state) do
-    {:reply, state.subscriptions, state}
+    result =
+      for {:undefined, pid, :worker, [Nostr.Subscription]} <-
+            DynamicSupervisor.which_children(Nostr.Client.Subscriptions) do
+        GenServer.call(pid, :state)
+      end
+
+    {:reply, result, state}
   end
 
   def handle_call(:get_connections, _from, state) do
-    {:reply, state.connections, state}
+    result =
+      for {:undefined, pid, :worker, [Nostr.Connection]} <-
+            DynamicSupervisor.which_children(Nostr.Client.Connections) do
+        GenServer.call(pid, :state)
+      end
+
+    {:reply, result, state}
   end
 
   @impl GenServer
@@ -110,7 +144,8 @@ defmodule Nostr.Client do
       {:ok, pid} =
         DynamicSupervisor.start_child(
           Nostr.Client.Connections,
-          {Nostr.Connection, [url: url, read_only: read_only]}
+          {Nostr.Connection,
+           [url: url, read_only: read_only, notice_handler: state.notice_handler]}
         )
 
       {:noreply, Map.update!(state, :connections, &Map.put(&1, url, %{pid: pid}))}
@@ -178,6 +213,15 @@ defmodule Nostr.Client do
     |> send_msg()
 
     {:noreply, state}
+  end
+
+  def handle_cast({:notice_handler, handler}, state) do
+    for {:undefined, pid, :worker, [Nostr.Connection]} <-
+          DynamicSupervisor.which_children(Nostr.Client.Connections) do
+      GenServer.cast(pid, {:notice_handler, handler})
+    end
+
+    {:noreply, Map.put(state, :notice_handler, handler)}
   end
 
   defp send_msg(msg) do

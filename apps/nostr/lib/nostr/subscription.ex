@@ -59,6 +59,10 @@ defmodule Nostr.Subscription do
     {:noreply, put_in(state, [:relays, url, :state], :eose)}
   end
 
+  def handle_cast({:subscribe, pid}, state) do
+    {:noreply, Map.update!(state, :subscribers, &[pid | &1])}
+  end
+
   @impl GenServer
   def handle_call(:close, _from, state) do
     Logger.debug("Closing subscription #{state.id}")
@@ -77,5 +81,9 @@ defmodule Nostr.Subscription do
 
   def handle_call(:events, _from, state) do
     {:reply, Enum.map(state.events, &elem(&1, 1)), state}
+  end
+
+  def handle_call(:state, _from, state) do
+    {:reply, state, state}
   end
 end

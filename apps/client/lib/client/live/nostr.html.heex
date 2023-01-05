@@ -4,24 +4,27 @@
 <div class="flex">
   <div class="flex-auto">
     <h1>Connected relays</h1>
-    <%= for {url, _state} <- @relays do %>
+    <%= for relay <- @relays do %>
       <p class="ml-6">
-        <.button class="py-1 px-2 my-1 mx-1" phx-click="disconnect" phx-value-url={url}>
+        <.button class="py-1 px-2 my-1 mx-1" phx-click="disconnect" phx-value-url={relay.url}>
           Disconnect
         </.button>
-        <%= url %>
+        <%= relay.url %> - <%= relay.status %>
       </p>
     <% end %>
   </div>
 
   <div class="flex-auto">
-    <h1>Active subscriptions</h1>
-    <%= for {id, _state} <- @subscriptions do %>
+    <h1>
+      Active subscriptions
+      <.button class="py-1 px-2 my-1 mx-1" phx-click="close-all">Close All</.button>
+    </h1>
+    <%= for sub <- @subscriptions do %>
       <p class="ml-6">
-        <.button class="py-1 px-2 my-1 mx-1" phx-click="close" phx-value-sub-id={id}>
+        <.button class="py-1 px-2 my-1 mx-1" phx-click="close" phx-value-sub-id={sub.id}>
           Close
         </.button>
-        <%= id %>
+        <%= sub.id %>
       </p>
     <% end %>
   </div>

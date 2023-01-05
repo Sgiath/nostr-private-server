@@ -9,7 +9,7 @@ defmodule Client.Live.Nostr do
 
     events =
       subs
-      |> Enum.map(fn {id, _data} -> Nostr.Client.get_events(id) end)
+      |> Enum.map(fn %{id: id} -> Nostr.Client.get_events(id) end)
       |> List.flatten()
       |> Enum.group_by(fn %Nostr.Event{kind: k} -> k end)
 
@@ -42,6 +42,12 @@ defmodule Client.Live.Nostr do
       |> Map.get(4, [])
       |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
 
+    if connected?(socket) do
+      pid = self()
+      Nostr.Client.change_notice_handler(&send(pid, {:notice, &1, &2}))
+      :timer.send_interval(500, pid, :update)
+    end
+
     {:ok,
      assign(socket, %{
        relays: Nostr.Client.get_cons(),
@@ -67,6 +73,14 @@ defmodule Client.Live.Nostr do
     Nostr.Client.disconnect_relay(url)
 
     {:noreply, assign(socket, :relays, Nostr.Client.get_cons())}
+  end
+
+  def handle_event("close-all", _value, socket) do
+    for %{id: id} <- socket.assigns.subscriptions do
+      Nostr.Client.close_sub(id)
+    end
+
+    {:noreply, assign(socket, :subscriptions, Nostr.Client.get_subs())}
   end
 
   def handle_event("close", %{"sub-id" => id}, socket) do
@@ -213,7 +227,15 @@ defmodule Client.Live.Nostr do
   # Handle end of stream events
   def handle_info({:notice, message, server}, socket) do
     Logger.warning("Received notice from server #{server}: #{message}")
-    {:noreply, socket}
+    {:noreply, put_flash(socket, :warn, "#{message} from #{server}")}
+  end
+
+  def handle_info(:update, socket) do
+    {:noreply,
+     assign(socket, %{
+       relays: Nostr.Client.get_cons(),
+       subscriptions: Nostr.Client.get_subs()
+     })}
   end
 
   defp sort(events) do
