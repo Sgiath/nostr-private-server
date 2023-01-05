@@ -23,14 +23,12 @@ defmodule Nostr.MixProject do
 
   def application do
     [
-      mod: {Nostr.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
 
   defp deps do
     [
-      {:phoenix_pubsub, "~> 2.1"},
       {:jason, "~> 1.2"},
 
       # Cryptography

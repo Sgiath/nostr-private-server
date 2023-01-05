@@ -1,24 +1,31 @@
 <.button phx-click="connect">Connect all configured relays</.button>
 <.button phx-click="request">Request data</.button>
 
-<h1>Connected relays</h1>
-<%= for {url, _state} <- @relays do %>
-  <p class="ml-6">
-    <.button class="py-1 px-2 my-1 mx-1" phx-click="disconnect" phx-value-url={url}>
-      Disconnect
-    </.button>
-    <%= url %>
-  </p>
-<% end %>
+<div class="flex">
+  <div class="flex-auto">
+    <h1>Connected relays</h1>
+    <%= for {url, _state} <- @relays do %>
+      <p class="ml-6">
+        <.button class="py-1 px-2 my-1 mx-1" phx-click="disconnect" phx-value-url={url}>
+          Disconnect
+        </.button>
+        <%= url %>
+      </p>
+    <% end %>
+  </div>
 
-<h1>Active subscriptions</h1>
-<%= for {id, _state} <- @subscriptions do %>
-  <p class="ml-6">
-    <.button class="py-1 px-2 my-1 mx-1" phx-click="close" phx-value-sub-id={id}>Close</.button>
-    <%= id %>
-  </p>
-<% end %>
-
+  <div class="flex-auto">
+    <h1>Active subscriptions</h1>
+    <%= for {id, _state} <- @subscriptions do %>
+      <p class="ml-6">
+        <.button class="py-1 px-2 my-1 mx-1" phx-click="close" phx-value-sub-id={id}>
+          Close
+        </.button>
+        <%= id %>
+      </p>
+    <% end %>
+  </div>
+</div>
 
 <%= if Map.has_key?(@metadata, "name") do %>
   <h2><%= @metadata["name"] %> <%= @metadata["nip05"] %></h2>
@@ -28,16 +35,24 @@
     <p><%= line %></p>
   <% end %>
 <% else %>
-  <h2>Profile <.button class="py-1 px-2" phx-click="request-profile">Request</.button></h2>
-
+  <h2>
+    Profile
+    <.button class="py-1 px-2" phx-click="request-profile">Request</.button>
+  </h2>
 <% end %>
 
-<h2>Following <.button class="py-1 px-2" phx-click="request-following">Request</.button></h2>
+<h2>
+  Following
+  <.button class="py-1 px-2" phx-click="request-following">Request</.button>
+</h2>
 <%= for f <- @following do %>
   <code><%= f %></code>
 <% end %>
 
-<h2>Notes <.button class="py-1 px-2" phx-click="request-notes">Request</.button></h2>
+<h2>
+  Notes
+  <.button class="py-1 px-2" phx-click="request-notes">Request</.button>
+</h2>
 <%= for e <- @notes do %>
   <p><%= e.content %></p>
   <p>Created at: <%= DateTime.to_iso8601(e.created_at) %></p>
@@ -49,7 +64,10 @@
   <br />
 <% end %>
 
-<h2>Messages <.button class="py-1 px-2" phx-click="request-messages">Request</.button></h2>
+<h2>
+  Messages
+  <.button class="py-1 px-2" phx-click="request-messages">Request</.button>
+</h2>
 <%= for %{created_at: date, content: c, tags: [%Nostr.Tag{type: :p, data: r} | _rest]} <- @messages do %>
   <pre><%= inspect(c, pretty: true) %></pre>
   <p>Send at: <%= DateTime.to_iso8601(date) %></p>

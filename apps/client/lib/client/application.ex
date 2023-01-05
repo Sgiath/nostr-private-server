@@ -6,6 +6,8 @@ defmodule Client.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      # PubSub for Phoenix
+      {Phoenix.PubSub, name: Nostr.PubSub},
       # Start the Telemetry supervisor
       Client.Telemetry,
       # Start the Endpoint (http/https)

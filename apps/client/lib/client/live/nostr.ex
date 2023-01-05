@@ -5,15 +5,52 @@ defmodule Client.Live.Nostr do
 
   @impl true
   def mount(_params, _args, socket) do
+    subs = Nostr.Client.get_subs()
+
+    events =
+      subs
+      |> Enum.map(fn {id, _data} -> Nostr.Client.get_events(id) end)
+      |> List.flatten()
+      |> Enum.group_by(fn %Nostr.Event{kind: k} -> k end)
+
+    meta =
+      events
+      |> Map.get(0, [])
+      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+      |> List.first(%{})
+      |> Map.get(:content, "{}")
+      |> Jason.decode!()
+
+    following =
+      events
+      |> Map.get(3, [])
+      |> Enum.filter(fn %Nostr.Event{pubkey: pubkey} -> pubkey == Client.Config.pubkey() end)
+      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+      |> List.first(%{})
+      |> Map.get(:tags, [])
+      |> Enum.filter(fn %{type: t} -> t == :p end)
+      |> Enum.map(fn %{data: data} -> data end)
+      |> Enum.into(MapSet.new())
+
+    notes =
+      events
+      |> Map.get(1, [])
+      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+
+    messages =
+      events
+      |> Map.get(4, [])
+      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+
     {:ok,
      assign(socket, %{
        relays: Nostr.Client.get_cons(),
-       subscriptions: Nostr.Client.get_subs(),
-       metadata: %{},
-       following: MapSet.new(),
-       notes: [],
+       subscriptions: subs,
+       metadata: meta,
+       following: following,
+       notes: notes,
        events: [],
-       messages: []
+       messages: messages
      })}
   end
 
@@ -83,6 +120,7 @@ defmodule Client.Live.Nostr do
       authors: [Client.Config.pubkey()],
       kinds: [1]
     }
+
     mentions = %Nostr.Filter{
       "#p": [Client.Config.pubkey()],
       kinds: [1]
@@ -98,6 +136,7 @@ defmodule Client.Live.Nostr do
       authors: [Client.Config.pubkey()],
       kinds: [4]
     }
+
     replies = %Nostr.Filter{
       "#p": [Client.Config.pubkey()],
       kinds: [4]

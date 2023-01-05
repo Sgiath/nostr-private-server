@@ -53,6 +53,10 @@ defmodule Nostr.Client do
     GenServer.call(__MODULE__, :get_connections)
   end
 
+  def get_events(id) do
+    GenServer.call({:global, {:subscription, id}}, :events)
+  end
+
   # Internals
 
   @impl GenServer
@@ -125,25 +129,34 @@ defmodule Nostr.Client do
   end
 
   def handle_cast({:start_sub, id, filters, :all, subs}, state) do
-    {:ok, pid} =
-      DynamicSupervisor.start_child(
-        Nostr.Client.Subscriptions,
-        {Nostr.Subscription, [id: id, filters: filters, relays: state.connections, subscribers: subs]}
-      )
+    case DynamicSupervisor.start_child(
+           Nostr.Client.Subscriptions,
+           {Nostr.Subscription,
+            [id: id, filters: filters, relays: state.connections, subscribers: subs]}
+         ) do
+      {:ok, pid} ->
+        {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
 
-    {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
+      {:error, {:already_started, _pid}} ->
+        Logger.warning("Subscription with ID \"#{id}\" already started")
+        {:noreply, state}
+    end
   end
 
   def handle_cast({:start_sub, id, filters, relays, subs}, state) do
     relays = Map.filter(state.connections, fn {url, _val} -> url in relays end)
 
-    {:ok, pid} =
-      DynamicSupervisor.start_child(
-        Nostr.Client.Subscriptions,
-        {Nostr.Subscription, [id: id, filters: filters, relays: relays, subscribers: subs]}
-      )
+    case DynamicSupervisor.start_child(
+           Nostr.Client.Subscriptions,
+           {Nostr.Subscription, [id: id, filters: filters, relays: relays, subscribers: subs]}
+         ) do
+      {:ok, pid} ->
+        {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
 
-    {:noreply, Map.update!(state, :subscriptions, &Map.put(&1, id, %{pid: pid}))}
+      {:error, {:already_started, _pid}} ->
+        Logger.warning("Subscription with ID \"#{id}\" already started")
+        {:noreply, state}
+    end
   end
 
   def handle_cast({:close_sub, id}, state) do

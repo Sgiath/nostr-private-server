@@ -17,7 +17,8 @@ defmodule Nostr.Subscription do
     relays = Keyword.fetch!(opts, :relays)
     subscribers = Keyword.fetch!(opts, :subscribers)
 
-    {:ok, %{id: id, filters: filters, relays: %{}, events: %{}, subscribers: subscribers}, {:continue, relays}}
+    {:ok, %{id: id, filters: filters, relays: %{}, events: %{}, subscribers: subscribers},
+     {:continue, relays}}
   end
 
   @impl GenServer
@@ -45,11 +46,16 @@ defmodule Nostr.Subscription do
       send(pid, event)
     end
 
-    {:noreply, put_in(state, [:relays, url, :state], :loading)}
+    state =
+      state
+      |> Map.update!(:events, &Map.put(&1, event.id, event))
+      |> put_in([:relays, url, :state], :loading)
+
+    {:noreply, state}
   end
 
   def handle_cast({:eose, url}, state) do
-    Logger.info("End of stream for #{url}")
+    Logger.debug("End of stream for #{url}")
     {:noreply, put_in(state, [:relays, url, :state], :eose)}
   end
 
@@ -67,5 +73,9 @@ defmodule Nostr.Subscription do
     end
 
     {:reply, :ok, state}
+  end
+
+  def handle_call(:events, _from, state) do
+    {:reply, Enum.map(state.events, &elem(&1, 1)), state}
   end
 end
