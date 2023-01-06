@@ -16,7 +16,7 @@ defmodule Client.Live.Nostr do
     meta =
       events
       |> Map.get(0, [])
-      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+      |> Enum.sort(&Kernel.==(DateTime.compare(&1.created_at, &2.created_at), :gt))
       |> List.first(%{})
       |> Map.get(:content, "{}")
       |> Jason.decode!()

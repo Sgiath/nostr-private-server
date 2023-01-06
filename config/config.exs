@@ -49,12 +49,18 @@ config :client,
     "wss://nostr.openchain.fr",
     "wss://relay.damus.io",
     "wss://relay.nostr.info",
-    "wss://relay.minds.com/nostr/v1/ws",
+    # "wss://relay.minds.com/nostr/v1/ws",
     "wss://nostr.oxtr.dev",
     "wss://nostr.bitcoiner.social",
     "wss://nostr.onsats.org",
     "wss://nostr-pub.semisol.dev",
-    "wss://nostr.ono.re"
+    "wss://nostr.ono.re",
+    "wss://nostr-relay.untethr.me",
+    "wss://nostr.noones.com",
+    "wss://nostr.fmt.wiz.biz",
+    "wss://nostr.v0l.io",
+    "wss://brb.io",
+    "wss://relay.nostr.bg"
   ]
 
 import_config "#{config_env()}.exs"

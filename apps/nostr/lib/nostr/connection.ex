@@ -15,16 +15,16 @@ defmodule Nostr.Connection do
     url = opts |> Keyword.fetch!(:url) |> URI.parse()
     read_only = Keyword.get(opts, :read_only, false)
 
-    notice_handler =
-      Keyword.get(opts, :notice_handler, fn msg, url ->
-        Logger.error("Notice from #{url}: #{msg}")
-      end)
+    notice_handler = Keyword.get(opts, :notice_handler, &Logger.error("Notice from #{&2}: #{&1}"))
 
     port =
       case url do
         %URI{scheme: "wss", port: port} -> port || 443
         %URI{scheme: "ws", port: port} -> port || 80
       end
+
+    # send ping every 20s
+    :timer.send_interval(Enum.random(20_000..30_000), self(), :ping)
 
     # Establish WebSocket connection
     {:ok, conn} =
@@ -72,11 +72,12 @@ defmodule Nostr.Connection do
   end
 
   def handle_info({:gun_response, _conn, _stream, _fin, status, _headers}, state) do
-    Logger.warning("Response #{status} #{state.url}")
+    Logger.warning("#{state.url} responded with status #{status}")
     {:noreply, state}
   end
 
-  def handle_info({:gun_data, _conn, _stream, _fin, _response}, state) do
+  def handle_info({:gun_data, _conn, _stream, _fin, response}, state) do
+    Logger.debug(response)
     {:noreply, state}
   end
 
@@ -95,6 +96,11 @@ defmodule Nostr.Connection do
     {:noreply, %{state | status: :closing}}
   end
 
+  def handle_info({:gun_error, _conn, _stream, :closed}, state) do
+    Logger.warning("Connection closed #{state.url}")
+    {:noreply, %{state | status: :down}}
+  end
+
   def handle_info({:gun_ws, _conn, _stream, {:text, message}}, state) do
     message
     |> Nostr.Message.parse()
@@ -109,6 +115,19 @@ defmodule Nostr.Connection do
         state.notice_handler.(message, state.url)
     end
 
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_ws, _conn, _stream, {:close, status, message}}, state) do
+    Logger.warning(
+      "#{state.url} WebSocket closed with #{status} status code and message #{inspect(message)}"
+    )
+
+    {:noreply, state}
+  end
+
+  def handle_info(:ping, state) do
+    :gun.ws_send(state.conn, state.stream, :ping)
     {:noreply, state}
   end
 
