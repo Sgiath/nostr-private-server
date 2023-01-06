@@ -5,7 +5,7 @@ defmodule Nostr.Subscription do
 
   def start_link(opts) do
     id = Keyword.fetch!(opts, :id)
-    GenServer.start_link(__MODULE__, opts, name: {:global, {:subscription, id}})
+    GenServer.start_link(__MODULE__, opts, name: {:via, Registry, {Nostr.Client.SubscriptionRegistry, id}})
   end
 
   # Private API
@@ -30,7 +30,8 @@ defmodule Nostr.Subscription do
 
     relays =
       relays
-      |> Enum.map(fn {url, %{pid: pid}} ->
+      |> Enum.map(fn url ->
+        [{pid, nil}] = Registry.lookup(Nostr.Client.RelayRegistry, url)
         GenServer.cast(pid, {:send, msg})
 
         {url, %{pid: pid, state: :init}}

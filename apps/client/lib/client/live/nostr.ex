@@ -44,7 +44,7 @@ defmodule Client.Live.Nostr do
 
     if connected?(socket) do
       pid = self()
-      Nostr.Client.change_notice_handler(&send(pid, {:notice, &1, &2}))
+      Nostr.Client.set_notice_handler(&send(pid, {:notice, &1, &2}))
       :timer.send_interval(500, pid, :update)
     end
 

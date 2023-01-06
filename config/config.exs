@@ -57,9 +57,9 @@ config :client,
     "wss://nostr.ono.re",
     "wss://nostr-relay.untethr.me",
     "wss://nostr.noones.com",
-    "wss://nostr.fmt.wiz.biz",
+    # "wss://nostr.fmt.wiz.biz",
     "wss://nostr.v0l.io",
-    "wss://brb.io",
+    # "wss://brb.io",
     "wss://relay.nostr.bg"
   ]
 

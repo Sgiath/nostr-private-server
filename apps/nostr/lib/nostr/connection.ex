@@ -5,7 +5,10 @@ defmodule Nostr.Connection do
 
   def start_link(opts) do
     url = Keyword.fetch!(opts, :url)
-    GenServer.start_link(__MODULE__, opts, name: {:global, {:relay, url}})
+
+    GenServer.start_link(__MODULE__, opts,
+      name: {:via, Registry, {Nostr.Client.RelayRegistry, url}}
+    )
   end
 
   # Private API
@@ -86,6 +89,11 @@ defmodule Nostr.Connection do
     {:noreply, %{state | status: :down}}
   end
 
+  def handle_info({:gun_down, _conn, :ws, :normal, _headers}, state) do
+    Logger.warning("WebSocket connection down normal #{state.url}")
+    {:noreply, %{state | status: :down}}
+  end
+
   def handle_info({:gun_down, _conn, :http, :closed, _headers}, state) do
     Logger.warning("HTTP connection down #{state.url}")
     {:noreply, %{state | status: :down}}
@@ -106,10 +114,12 @@ defmodule Nostr.Connection do
     |> Nostr.Message.parse()
     |> case do
       {:event, sub_id, event} ->
-        GenServer.cast({:global, {:subscription, sub_id}}, {event, state.url})
+        [{pid, nil}] = Registry.lookup(Nostr.Client.SubscriptionRegistry, sub_id)
+        GenServer.cast(pid, {event, state.url})
 
       {:eose, sub_id} ->
-        GenServer.cast({:global, {:subscription, sub_id}}, {:eose, state.url})
+        [{pid, nil}] = Registry.lookup(Nostr.Client.SubscriptionRegistry, sub_id)
+        GenServer.cast(pid, {:eose, state.url})
 
       {:notice, message} ->
         state.notice_handler.(message, state.url)
