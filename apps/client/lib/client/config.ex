@@ -3,8 +3,6 @@ defmodule Client.Config do
   Configuration
   """
 
-  @dialyzer {:no_return, pubkey: 0}
-
   def seckey do
     Application.get_env(:client, :seckey)
   end
