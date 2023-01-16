@@ -1,2 +1,0 @@
-defmodule Nostr do
-end

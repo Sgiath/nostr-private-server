@@ -35,7 +35,7 @@ defmodule Client.MixProject do
   defp deps do
     [
       # Umbrella
-      {:nostr, in_umbrella: true},
+      {:nostr_client, github: "Sgiath/nostr-client"},
 
       # Phoenix
       {:phoenix, "~> 1.7.0-rc.0", override: true},
