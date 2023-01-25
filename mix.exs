@@ -13,7 +13,7 @@ defmodule Nostr.Umbrella.MixProject do
 
   defp deps do
     [
-      {:phoenix, ">= 1.7.0-rc.0", override: true},
+      {:phoenix, ">= 1.7.0-rc.2", override: true},
       # Required to run "mix format" on ~H/.heex files from the umbrella root
       {:phoenix_live_view, ">= 0.0.0"}
     ]

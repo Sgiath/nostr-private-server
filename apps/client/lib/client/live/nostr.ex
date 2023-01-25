@@ -11,40 +11,45 @@ defmodule Client.Live.Nostr do
       subs
       |> Enum.map(fn %{id: id} -> Nostr.Client.get_events(id) end)
       |> List.flatten()
-      |> Enum.group_by(fn %Nostr.Event{kind: k} -> k end)
+      |> Enum.group_by(fn %{event: %Nostr.Event{kind: k}} -> k end)
 
     meta =
       events
       |> Map.get(0, [])
-      |> Enum.sort(&Kernel.==(DateTime.compare(&1.created_at, &2.created_at), :gt))
+      |> Enum.sort(&Kernel.==(DateTime.compare(&1.event.created_at, &2.event.created_at), :gt))
       |> List.first(%{})
-      |> Map.get(:content, "{}")
-      |> Jason.decode!()
 
     following =
       events
       |> Map.get(3, [])
-      |> Enum.filter(fn %Nostr.Event{pubkey: pubkey} -> pubkey == Client.Config.pubkey() end)
-      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
-      |> List.first(%{})
-      |> Map.get(:tags, [])
-      |> Enum.filter(fn %{type: t} -> t == :p end)
-      |> Enum.map(fn %{data: data} -> data end)
+      |> Enum.filter(fn %Nostr.Event.Contacts{user: pubkey} ->
+        pubkey == Client.Config.pubkey()
+      end)
+      |> Enum.map(fn %Nostr.Event.Contacts{contacts: c} -> c end)
+      |> List.flatten()
       |> Enum.into(MapSet.new())
 
     notes =
       events
       |> Map.get(1, [])
-      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+      |> Enum.sort(fn %{event: %{created_at: c1}}, %{event: %{created_at: c2}} ->
+        DateTime.compare(c1, c2) == :gt
+      end)
 
     messages =
       events
       |> Map.get(4, [])
-      |> Enum.sort(fn %{created_at: c1}, %{created_at: c2} -> DateTime.compare(c1, c2) == :gt end)
+      |> Enum.sort(fn %{event: %{created_at: c1}}, %{event: %{created_at: c2}} ->
+        DateTime.compare(c1, c2) == :gt
+      end)
+      |> Enum.map(&Nostr.Event.DirectMessage.decrypt(&1, Client.Config.seckey()))
 
     if connected?(socket) do
       pid = self()
+
       Nostr.Client.set_notice_handler(&send(pid, {:notice, &1, &2}))
+      Nostr.Client.set_auth_handler(&send(pid, {:notice, &1, &2}))
+
       :timer.send_interval(500, pid, :update)
     end
 
@@ -163,22 +168,22 @@ defmodule Client.Live.Nostr do
 
   @impl true
   # Handle metadata
-  def handle_info(%Nostr.Event{kind: 0, content: content}, socket) do
-    {:noreply, assign(socket, :metadata, Jason.decode!(content))}
+  def handle_info(%Nostr.Event.Metadata{} = event, socket) do
+    {:noreply, assign(socket, :metadata, event)}
   end
 
   # Handle note
-  def handle_info(%Nostr.Event{kind: 1} = event, socket) do
+  def handle_info(%Nostr.Event.Note{} = event, socket) do
     {:noreply, assign(socket, :notes, sort([event | socket.assigns.notes]))}
   end
 
   # Handle following
-  def handle_info(%Nostr.Event{pubkey: p, kind: 3, tags: tags}, socket) do
+  def handle_info(%Nostr.Event.Contacts{user: p, contacts: c}, socket) do
     if p == Client.Config.pubkey() do
       f =
         MapSet.union(
           socket.assigns.following,
-          tags |> Enum.map(&Map.get(&1, :data)) |> Enum.into(MapSet.new())
+          MapSet.new(c)
         )
 
       {:noreply, assign(socket, :following, f)}
@@ -188,27 +193,14 @@ defmodule Client.Live.Nostr do
   end
 
   # Handle encrypted message
-  def handle_info(%Nostr.Event{pubkey: pubkey, kind: 4, tags: tags} = event, socket) do
+  def handle_info(%Nostr.Event.DirectMessage{} = event, socket) do
     seckey = Client.Config.seckey()
-    my_pubkey = Client.Config.pubkey()
-
-    pubkey =
-      if pubkey == my_pubkey do
-        Enum.find_value(tags, fn
-          %Nostr.Tag{type: :p, data: pubkey} -> pubkey
-          _ -> false
-        end)
-      else
-        pubkey
-      end
-
-    event = Map.update!(event, :content, &Nostr.Crypto.decrypt(&1, seckey, pubkey))
-
+    event = Nostr.Event.DirectMessage.decrypt(event, seckey)
     {:noreply, assign(socket, :messages, sort([event | socket.assigns.messages]))}
   end
 
   # Handle other events
-  def handle_info(%Nostr.Event{} = event, socket) do
+  def handle_info(%{event: _event} = event, socket) do
     {:noreply, assign(socket, :events, sort([event | socket.assigns.events]))}
   end
 
@@ -233,8 +225,9 @@ defmodule Client.Live.Nostr do
 
   defp sort(events) do
     events
-    |> Enum.uniq_by(fn %Nostr.Event{id: id} -> id end)
-    |> Enum.sort(fn %Nostr.Event{created_at: c1}, %Nostr.Event{created_at: c2} ->
+    |> Enum.uniq_by(fn %{event: %Nostr.Event{id: id}} -> id end)
+    |> Enum.sort(fn %{event: %Nostr.Event{created_at: c1}},
+                    %{event: %Nostr.Event{created_at: c2}} ->
       DateTime.compare(c1, c2) == :gt
     end)
   end

@@ -30,11 +30,15 @@
   </div>
 </div>
 
-<%= if Map.has_key?(@metadata, "name") do %>
-  <h2><%= @metadata["name"] %> <%= @metadata["nip05"] %></h2>
-  <img class="rounded-full w-24 h-24" src={@metadata["picture"]} alt="Profile picture" />
+<%= if Map.has_key?(@metadata, :name) do %>
+  <h2><%= @metadata.name %> <%= @metadata.nip05 %></h2>
+  <img
+    class="rounded-full w-24 h-24"
+    src={URI.to_string(@metadata.picture)}
+    alt="Profile picture"
+  />
   <h3>About</h3>
-  <%= for line <- String.split(@metadata["about"], "\n") do %>
+  <%= for line <- String.split(@metadata.about, "\n") do %>
     <p><%= line %></p>
   <% end %>
 <% else %>
@@ -49,7 +53,7 @@
   <.button class="py-1 px-2" phx-click="request-following">Request</.button>
 </h2>
 <%= for f <- @following do %>
-  <code><%= f %></code>
+  <code><%= f.user %></code>
   <br />
 <% end %>
 
@@ -58,11 +62,15 @@
   <.button class="py-1 px-2" phx-click="request-notes">Request</.button>
 </h2>
 <%= for e <- @notes do %>
-  <p><%= e.content %></p>
-  <p>Created at: <%= DateTime.to_iso8601(e.created_at) %></p>
+  <p><%= e.note %></p>
+  <p>Created at: <%= DateTime.to_iso8601(e.event.created_at) %></p>
   <div class="ml-6">
-    <%= for t <- e.tags do %>
-      <pre><%= inspect(t) %></pre>
+    <strong>Replying to:</strong>
+    <%= for t <- e.reply_to do %>
+      <pre>e: <%= inspect(t) %></pre>
+    <% end %>
+    <%= for t <- e.reply_to_authors do %>
+      <pre>p: <%= inspect(t) %></pre>
     <% end %>
   </div>
   <br />
@@ -72,10 +80,11 @@
   Messages
   <.button class="py-1 px-2" phx-click="request-messages">Request</.button>
 </h2>
-<%= for %{created_at: date, content: c, tags: [%Nostr.Tag{type: :p, data: r} | _rest]} <- @messages do %>
-  <pre><%= inspect(c, pretty: true) %></pre>
+<%= for %{event: %{created_at: date}, from: from, to: to, plain_text: p} <- @messages do %>
+  <pre><%= inspect(p, pretty: true) %></pre>
   <p>Send at: <%= DateTime.to_iso8601(date) %></p>
-  <p><em>Recipient:</em> <code><%= r %></code></p>
+  <p><em>From:</em> <code><%= from %></code></p>
+  <p><em>To:</em> <code><%= to %></code></p>
   <br />
 <% end %>
 

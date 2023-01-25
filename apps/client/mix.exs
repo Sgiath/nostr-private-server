@@ -38,7 +38,7 @@ defmodule Client.MixProject do
       {:nostr_client, github: "Sgiath/nostr-client"},
 
       # Phoenix
-      {:phoenix, "~> 1.7.0-rc.0", override: true},
+      {:phoenix, "~> 1.7.0-rc.2", override: true},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 0.18"},
@@ -48,7 +48,7 @@ defmodule Client.MixProject do
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 0.20"},
+      {:gettext, "~> 0.22"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 0.6"},
 
