@@ -188,10 +188,7 @@ defmodule Client.Live.Nostr do
   end
 
   # Handle encrypted message
-  def handle_info(
-        %Nostr.Event{pubkey: pubkey, kind: 4, content: content, tags: tags} = event,
-        socket
-      ) do
+  def handle_info(%Nostr.Event{pubkey: pubkey, kind: 4, tags: tags} = event, socket) do
     seckey = Client.Config.seckey()
     my_pubkey = Client.Config.pubkey()
 
@@ -205,11 +202,7 @@ defmodule Client.Live.Nostr do
         pubkey
       end
 
-    event =
-      Map.put(event, :content, %{
-        cipher_text: content,
-        plain_text: Nostr.Crypto.decrypt(content, seckey, pubkey)
-      })
+    event = Map.update!(event, :content, &Nostr.Crypto.decrypt(&1, seckey, pubkey))
 
     {:noreply, assign(socket, :messages, sort([event | socket.assigns.messages]))}
   end
