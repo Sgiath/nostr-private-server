@@ -35,25 +35,27 @@ defmodule Client.MixProject do
   defp deps do
     [
       # Umbrella
-      {:nostr_client, github: "Sgiath/nostr-client"},
+      {:secp256k1, path: "../../../secp256k1"},
+      {:nostr_lib, path: "../../../nostr_lib"},
+      {:nostr_client, path: "../../../nostr_client"},
 
       # Phoenix
-      {:phoenix, "~> 1.7.0-rc.2", override: true},
-      {:phoenix_html, "~> 3.0"},
-      {:phoenix_live_reload, "~> 1.2", only: :dev},
+      {:phoenix, "~> 1.7", override: true},
+      {:phoenix_html, "~> 3.3"},
+      {:phoenix_live_reload, "~> 1.4", only: :dev},
       {:phoenix_live_view, "~> 0.18"},
       {:heroicons, "~> 0.5"},
       {:phoenix_live_dashboard, "~> 0.7"},
-      {:esbuild, "~> 0.5", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.7", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.22"},
-      {:jason, "~> 1.2"},
-      {:bandit, "~> 0.6"},
+      {:jason, "~> 1.4"},
+      {:bandit, "~> 0.7"},
 
       # Tests
-      {:floki, ">= 0.30.0", only: :test}
+      {:floki, ">= 0.34.0", only: :test}
     ]
   end
 

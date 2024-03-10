@@ -20,6 +20,7 @@ defmodule Client.Router do
     get "/", PageController, :home
 
     live "/nostr", Live.Nostr
+    live "/nostr/messages", MessagesLive
   end
 
   # Other scopes may use custom stacks.
